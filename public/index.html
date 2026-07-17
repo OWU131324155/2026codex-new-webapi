@@ -3,1829 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Mystery Brancher</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="story.css">
+    <title>AI Detective Office</title>
+    <link rel="stylesheet" href="office-hub.css">
+    <link rel="stylesheet" href="detective-sim.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/vendor/three/build/three.module.js",
+                "three/addons/": "/vendor/three/examples/jsm/"
+            }
+        }
+    </script>
 </head>
-<body class="story-page demo-case">
-    <div class="container story-shell">
-        <header class="header story-header">
-            <div>
-                <span class="story-kicker">Interactive Mystery Desk</span>
-                <h1>AI謎解きストーリー</h1>
-                <p>現場を読み、証言を照合し、矛盾から真相へ進みます。</p>
-            </div>
-            <div class="header-actions">
-                <button class="btn secondary-btn" id="howToBtn">遊び方</button>
-                <button class="btn secondary-btn" id="settingsBtn">設定</button>
-                <a class="btn secondary-btn" href="quiz.html">クイズへ</a>
-            </div>
-        </header>
+<body class="office-hub">
+    <main class="office-stage" id="officeStage" aria-label="3D探偵事務所ホーム">
+        <canvas id="officeCanvas" aria-label="歩き回れる3D探偵事務所"></canvas>
 
-        <section class="settings-panel hidden" id="settingsPanel">
-            <div class="settings-copy">
-                <span class="story-kicker">About This Work</span>
-                <h2>作品概要</h2>
-                <p>AIが事件、証拠、証言を組み立てる短編推理ゲームです。</p>
-                <p>プレイヤーは証拠ボードを見ながら矛盾を照合し、最後に推理を提出します。</p>
-                <p>発表用の体験版はAI待ちなしで、1〜3分でも面白さが伝わる構成です。</p>
+        <div class="office-reticle" aria-hidden="true"></div>
+        <div class="office-vignette" aria-hidden="true"></div>
+        <div class="office-transition" id="officeTransition" aria-hidden="true">
+            <span></span>
+        </div>
+
+        <section class="office-lock-prompt" id="officeLockPrompt">
+            <span class="hud-kicker">AI Detective Office</span>
+            <strong>クリックして探偵事務所へ入る</strong>
+            <p>WASDで移動、Shiftで早歩き、マウスで視点変更、左クリックで調査</p>
+        </section>
+
+        <section class="office-hud" aria-live="polite">
+            <div>
+                <span class="hud-kicker">Focused Object</span>
+                <strong id="officeFocusName">事務所を探索中</strong>
+                <p id="officeFocusDescription">近づいて左クリックで調べます。Escで視点ロック解除。</p>
             </div>
-            <div class="settings-meta">
-                <h3>使った技術</h3>
-                <div class="tech-list">
-                    <span>Node.js</span>
-                    <span>Express</span>
-                    <span>OpenAI API</span>
-                    <span>HTML/CSS/JavaScript</span>
-                </div>
-            </div>
-            <div class="settings-controls">
-                <label>
-                    UIの雰囲気
-                    <select id="themeSelect">
-                        <option value="theme-noir">ノワール</option>
-                        <option value="theme-neon">ネオン</option>
-                        <option value="theme-sunset">サンセット</option>
-                        <option value="theme-mint">ミント</option>
-                    </select>
-                </label>
-                <div>
-                    <span class="control-label">アクセントカラー</span>
-                    <div class="swatch-row" id="swatchRow">
-                        <button class="swatch selected" data-accent="#d99b35" style="--swatch: #d99b35"></button>
-                        <button class="swatch" data-accent="#ff5f7e" style="--swatch: #ff5f7e"></button>
-                        <button class="swatch" data-accent="#4cc9f0" style="--swatch: #4cc9f0"></button>
-                        <button class="swatch" data-accent="#7bd88f" style="--swatch: #7bd88f"></button>
-                        <button class="swatch" data-accent="#b38cff" style="--swatch: #b38cff"></button>
-                    </div>
-                </div>
-                <label class="sound-toggle">
-                    <input id="soundToggle" type="checkbox" checked>
-                    サウンド効果
-                </label>
+            <div class="office-state">
+                <span id="officeTimeLabel">00:17</span>
+                <span id="officeWeatherLabel">Rain</span>
             </div>
         </section>
 
-        <main class="story-board">
-            <section class="setup-panel" id="setupPanel">
-                <div class="setup-layout">
-                    <div class="case-visual setup-visual" aria-hidden="true">
-                        <div class="visual-window">
-                            <div class="scan-line"></div>
-                            <div class="signal-dot dot-a"></div>
-                            <div class="signal-dot dot-b"></div>
-                            <div class="signal-dot dot-c"></div>
-                            <div class="scene-map">
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                            </div>
-                        </div>
-                        <div class="visual-caption">
-                            <strong id="caseVisualTitle">5分体験: 消えたマカロン</strong>
-                            <span>Case feed ready</span>
-                        </div>
-                    </div>
+        <section class="office-case-strip" aria-label="現在進行中事件">
+            <span class="hud-kicker">Active Case</span>
+            <strong id="activeCaseLabel">未受注</strong>
+        </section>
 
-                    <div class="setup-content">
-                        <div class="form-group">
-                            <label>事件ファイル</label>
-                            <div class="preset-grid" id="presetGrid">
-                                <button class="preset selected" data-case="demo" data-label="5分体験: 消えたマカロン" data-world="紹介用の体験版。放課後のカフェで、ショーケースから限定マカロンが1つ消えた小さな謎解きミステリー。登場人物は店員、常連客、配達員の3人程度。証拠と証言の矛盾が分かりやすく、3〜4ターンで犯人・動機・決定的証拠まで推理できる。怖さはなく、初めての人でも操作を理解しやすいテンポにする">
-                                    <strong>5分体験: 消えたマカロン</strong>
-                                    <span>紹介用。短く、矛盾が分かりやすい入門事件。</span>
-                                </button>
-                                <button class="preset" data-case="aquarium" data-label="消えた水槽のSOS" data-world="閉館後の水族館で、存在しないはずの水槽からSOSの光が点滅する謎解きミステリー">
-                                    <strong>消えた水槽のSOS</strong>
-                                    <span>閉館後の水族館、点滅する光、濡れた足跡。</span>
-                                </button>
-                                <button class="preset" data-case="school" data-label="未来放送の夜" data-world="文化祭前夜の学校で、誰もいない放送室から未来の校内放送が流れる謎解きミステリー">
-                                    <strong>未来放送の夜</strong>
-                                    <span>文化祭、放送室、まだ起きていない事件。</span>
-                                </button>
-                                <button class="preset" data-case="hotel" data-label="13階の招待状" data-world="古いホテルのエレベーターで、13階だけ存在しないはずなのにボタンが光る謎解きミステリー">
-                                    <strong>13階の招待状</strong>
-                                    <span>古いホテル、存在しない階、差出人不明の鍵。</span>
-                                </button>
-                            </div>
-                        </div>
+        <div class="office-esc-hint">ESCキーでメニューに戻れます</div>
 
-                        <div class="story-controls">
-                            <div class="form-group">
-                                <label for="heroInput">探偵役</label>
-                                <input id="heroInput" type="text" value="高校生探偵ミナト" maxlength="40">
-                            </div>
-                            <div class="form-group">
-                                <label for="toneSelect">雰囲気</label>
-                                <select id="toneSelect">
-                                    <option value="不思議で、推理したくなる">不思議</option>
-                                    <option value="テンポがよく、少しコミカル">コミカル</option>
-                                    <option value="静かで美しいが、違和感が残る">静か</option>
-                                    <option value="緊張感があるが怖すぎない">スリル</option>
-                                </select>
-                            </div>
-                        </div>
+        <section class="office-mini-map" aria-hidden="true">
+            <span class="map-dot map-door"></span>
+            <span class="map-dot map-desk"></span>
+            <span class="map-dot map-board"></span>
+            <span class="map-dot map-ai"></span>
+            <span class="map-dot map-library"></span>
+            <span class="map-dot map-forensic"></span>
+            <span class="map-dot map-player" id="officePlayerDot"></span>
+        </section>
 
-                        <button class="btn primary-action" id="startBtn">捜査を始める</button>
-                        <div class="demo-brief" id="demoBrief">
-                            <strong>1〜3分の紹介用</strong>
-                            <span>体験版はAI待ちなしで即進行します。「捜査を始める」→「答え」→光った場所を押す、で証拠・矛盾・推理提出まで見せられます。</span>
-                        </div>
-                        <section class="how-to-panel" aria-labelledby="howToTitle">
-                            <div class="how-to-heading">
-                                <div>
-                                    <span class="story-kicker">How To Play</span>
-                                    <h2 id="howToTitle">遊び方</h2>
-                                </div>
-                                <button class="btn secondary-btn mini-btn" id="howToDetailBtn">詳しく見る</button>
-                            </div>
-                            <div class="how-to-steps">
-                                <article>
-                                    <strong>1. 事件を選ぶ</strong>
-                                    <span>事件ファイルと探偵役を決めて、捜査を始めます。</span>
-                                </article>
-                                <article>
-                                    <strong>2. 証拠を集める</strong>
-                                    <span>次の行動を選ぶと、証拠・証言・人物情報が増えます。</span>
-                                </article>
-                                <article>
-                                    <strong>3. 矛盾を照合</strong>
-                                    <span>証言と証拠を選んで「照合」を押し、嘘や食い違いを見つけます。</span>
-                                </article>
-                                <article>
-                                    <strong>4. 推理を提出</strong>
-                                    <span>犯人、動機、トリック、決定的証拠を埋めて事件を解決します。</span>
-                                </article>
-                            </div>
-                        </section>
-                        <section class="case-archive">
-                            <div class="archive-heading">
-                                <div>
-                                    <span class="story-kicker">Solved Files</span>
-                                    <strong>解決済み事件ファイル</strong>
-                                </div>
-                                <button class="btn secondary-btn mini-btn" id="clearArchiveBtn">整理</button>
-                            </div>
-                            <div class="archive-list" id="caseArchiveList"></div>
-                        </section>
-                    </div>
-                </div>
-            </section>
-
-            <section class="scene-panel hidden" id="scenePanel">
-                <div class="scene-stage">
-                    <div class="scene-copy">
-                        <div class="scene-meta">
-                            <span class="pill" id="turnPill">Turn 1</span>
-                            <span class="pill" id="locationPill">Location</span>
-                            <span class="pill" id="moodPill">Mood</span>
-                        </div>
-                        <h2 class="scene-title" id="sceneTitle"></h2>
-                        <div class="scene-text" id="sceneText"></div>
-                    </div>
-                    <div class="case-visual scene-visual" aria-hidden="true">
-                        <div class="visual-window">
-                            <div class="scan-line"></div>
-                            <div class="signal-dot dot-a"></div>
-                            <div class="signal-dot dot-b"></div>
-                            <div class="signal-dot dot-c"></div>
-                            <div class="scene-map">
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                            </div>
-                        </div>
-                        <div class="visual-caption">
-                            <strong id="sceneCommand">現場解析</strong>
-                            <span id="sceneFeedLabel">Evidence feed</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="assist-toolbar hidden" id="assistToolbar">
-                    <button class="btn hint-btn" id="hintBtn">ヒント</button>
-                    <button class="btn answer-btn hidden" id="answerBtn">答え</button>
-                    <div class="assist-guide" id="assistGuide">
-                        <strong>捜査サポート</strong>
-                        <span>詰まったらヒントを押してください。段階的に核心へ近づきます。</span>
-                    </div>
-                </div>
-                <div class="case-overview" id="caseOverview">
-                    <div class="case-progress" aria-hidden="true">
-                        <div class="progress-track">
-                            <i id="progressEvidence"></i>
-                            <i id="progressTestimony"></i>
-                            <i id="progressContradiction"></i>
-                        </div>
-                        <div class="progress-labels">
-                            <span>証拠</span>
-                            <span>証言</span>
-                            <span>矛盾</span>
-                        </div>
-                    </div>
-                    <div class="visual-dossier">
-                        <div class="visual-stat">
-                            <strong id="visualEvidenceCount">0</strong>
-                            <span>証拠</span>
-                        </div>
-                        <div class="visual-stat">
-                            <strong id="visualTestimonyCount">0</strong>
-                            <span>証言</span>
-                        </div>
-                        <div class="visual-stat accent">
-                            <strong id="visualContradictionCount">0</strong>
-                            <span>矛盾</span>
-                        </div>
-                    </div>
-                    <div class="evidence-strip" id="evidenceStrip"></div>
-                </div>
-                <section class="recap-panel hidden" id="recapPanel">
-                    <div class="panel-heading">
-                        <h3>事件のまとめ</h3>
-                        <span id="recapVerdict">推理結果</span>
-                    </div>
-                    <div class="recap-grid">
-                        <div class="recap-block">
-                            <h4>事件の流れ</h4>
-                            <ol id="recapTimeline"></ol>
-                        </div>
-                        <div class="recap-block">
-                            <h4>決め手</h4>
-                            <p id="recapEvidence"></p>
-                        </div>
-                        <div class="recap-block wide">
-                            <h4>真相</h4>
-                            <p id="recapTruth"></p>
-                        </div>
-                        <div class="recap-block wide">
-                            <h4>評価</h4>
-                            <p id="recapComment"></p>
-                        </div>
-                    </div>
-                </section>
-                <div class="investigation-layout">
-                    <div class="action-panel">
-                        <div class="section-heading">
-                            <h3>次の行動</h3>
-                            <span>選ぶと捜査が進みます</span>
-                        </div>
-                        <div class="choice-list" id="choiceList"></div>
-                        <section class="deduction-panel hidden" id="deductionPanel">
-                            <div class="panel-heading">
-                                <h3>最終推理</h3>
-                                <span id="deductionHint">証拠をそろえると提出できます</span>
-                            </div>
-                            <div class="deduction-grid">
-                                <label>
-                                    犯人・仕掛けた人物
-                                    <input id="culpritInput" type="text" maxlength="40" placeholder="例: 受付係の佐伯">
-                                </label>
-                                <label>
-                                    動機
-                                    <input id="motiveInput" type="text" maxlength="80" placeholder="例: 隠した記録を守るため">
-                                    <span class="deduction-options" id="motiveOptionList"></span>
-                                </label>
-                                <label>
-                                    トリック
-                                    <textarea id="trickInput" maxlength="160" placeholder="どうやって不可能に見せたか"></textarea>
-                                    <span class="deduction-options" id="trickOptionList"></span>
-                                </label>
-                                <label>
-                                    決定的証拠
-                                    <select id="decisiveEvidenceSelect"></select>
-                                </label>
-                            </div>
-                            <button class="btn" id="submitDeductionBtn">推理を提出する</button>
-                        </section>
-                    </div>
-
-                    <aside class="case-panel">
-                        <div class="panel-heading">
-                            <h3>捜査ファイル</h3>
-                            <span id="boardCount">0件</span>
-                        </div>
-                        <div class="board-section suspect-section">
-                            <h4>人物</h4>
-                            <div class="character-list" id="characterList"></div>
-                        </div>
-                        <div class="board-section">
-                            <h4>証拠</h4>
-                            <div class="board-list" id="evidenceList"></div>
-                        </div>
-                        <div class="board-section">
-                            <h4>証言</h4>
-                            <div class="board-list" id="testimonyList"></div>
-                        </div>
-                        <div class="board-section">
-                            <h4>矛盾チェック</h4>
-                            <div class="match-controls">
-                                <select id="testimonySelect"></select>
-                                <select id="evidenceSelect"></select>
-                                <button class="btn secondary-btn" id="checkContradictionBtn">照合</button>
-                            </div>
-                            <div class="contradiction-result" id="contradictionResult">証言と証拠を選んで照合します。</div>
-                            <div class="board-list solved-list" id="solvedContradictionList"></div>
-                        </div>
-                    </aside>
-                </div>
-            </section>
-
-            <div class="story-footer">
-                <div class="stats">
-                    <div class="stat">
-                        <span>手がかり</span>
-                        <strong id="courageStat">0</strong>
-                        <div class="stat-meter"><i id="courageMeter"></i></div>
-                    </div>
-                    <div class="stat">
-                        <span>推理</span>
-                        <strong id="witStat">0</strong>
-                        <div class="stat-meter"><i id="witMeter"></i></div>
-                    </div>
-                    <div class="stat">
-                        <span>疑念</span>
-                        <strong id="trustStat">0</strong>
-                        <div class="stat-meter danger"><i id="trustMeter"></i></div>
-                    </div>
-                </div>
-                <div class="footer-actions">
-                    <button class="btn secondary-btn" id="saveBtn">保存</button>
-                    <button class="btn secondary-btn" id="loadBtn">ロード</button>
-                    <button class="btn secondary-btn" id="replayBtn">リプレイ</button>
-                    <button class="btn secondary-btn" id="resetBtn">最初から</button>
-                </div>
-            </div>
-        </main>
-
-        <div class="loading story-loading" id="loading">AIが次の手がかりを組み立てています...</div>
-        <div class="generation-overlay hidden" id="generationOverlay">
-            <div class="generation-card">
-                <span class="generation-kicker">GENERATING CASE</span>
-                <strong>AIが次の手がかりを生成中</strong>
-                <div class="generation-bar"><i></i></div>
-                <p>体験版は待ち時間なし。通常シナリオのみAI生成を使います。</p>
-            </div>
+        <div class="office-log" id="officeLog" aria-live="polite">
+            3D空間がホーム画面です。机、AI助手、本棚、コレクション棚、事件ボードを調べてください。
         </div>
-        <div class="fx-layer" id="fxLayer"></div>
-        <div class="action-toast hidden" id="actionToast"></div>
-        <div class="ending-overlay hidden" id="endingOverlay">
-            <div class="ending-card">
-                <span class="ending-kicker">CASE CLOSED</span>
-                <strong id="endingTitle">事件解決</strong>
-                <p id="endingText">証拠と証言がつながり、真相に到達しました。</p>
-                <div class="ending-actions">
-                    <button class="btn secondary-btn" id="endingArchiveBtn">事件ファイルへ</button>
-                    <button class="btn" id="endingReplayBtn">同じ事件をリプレイ</button>
-                    <button class="btn secondary-btn" id="endingCloseBtn">閉じる</button>
-                </div>
-            </div>
-        </div>
-        <div class="how-to-overlay hidden" id="howToOverlay" role="dialog" aria-modal="true" aria-labelledby="howToOverlayTitle">
-            <div class="how-to-card">
-                <div class="how-to-card-heading">
+
+        <section class="office-panel hidden" id="officePanel" role="dialog" aria-modal="true" aria-labelledby="officePanelTitle">
+            <div class="office-panel-card">
+                <header class="office-panel-heading">
                     <div>
-                        <span class="story-kicker">Investigation Guide</span>
-                        <strong id="howToOverlayTitle">推理ゲームの進め方</strong>
+                        <span class="hud-kicker" id="officePanelKicker">Detective Office</span>
+                        <h1 id="officePanelTitle">探偵事務所</h1>
                     </div>
-                    <button class="btn secondary-btn mini-btn" id="howToCloseBtn">閉じる</button>
+                    <button class="panel-close" id="officePanelClose" type="button">3D事務所へ戻る</button>
+                </header>
+                <div class="office-panel-body" id="officePanelBody"></div>
+            </div>
+        </section>
+    </main>
+
+    <main class="detective-game hidden" id="detectiveGame" aria-label="AI探偵シミュレーションゲーム">
+        <section class="game-topbar">
+            <div>
+                <span class="hud-kicker">AI Detective Simulation</span>
+                <h1 id="gameCaseTitle">事件未選択</h1>
+            </div>
+            <div class="game-statusline">
+                <span id="gameTurnLabel">Turn 0</span>
+                <span id="gameStatusLabel">待機中</span>
+                <button class="hub-button ghost" id="gameBackOfficeBtn" type="button">事務所へ戻る</button>
+            </div>
+        </section>
+
+        <section class="game-layout">
+            <aside class="game-dossier">
+                <div class="dossier-block">
+                    <span class="hud-kicker">Case</span>
+                    <strong id="gameLocation">現場未確定</strong>
+                    <p id="gameSummary">メインデスクから事件を受注してください。</p>
                 </div>
-                <div class="how-to-guide-grid">
-                    <section>
-                        <h3>基本の流れ</h3>
-                        <ol>
-                            <li>事件ファイルを選び、「捜査を始める」を押します。</li>
-                            <li>場面文を読み、「次の行動」から調べたい場所や人物を選びます。</li>
-                            <li>右側の捜査ファイルに集まった証拠と証言を確認します。</li>
-                            <li>怪しい証言と対応する証拠を選び、「照合」で矛盾を確定します。</li>
-                            <li>最終推理が開いたら、犯人・動機・トリック・決定的証拠を提出します。</li>
-                        </ol>
-                    </section>
-                    <section>
-                        <h3>詰まったとき</h3>
-                        <ul>
-                            <li>証拠カードや人物カードを押すと、推理欄や照合欄に自動で入ります。</li>
-                            <li>「ヒント」は段階的に核心へ近づきます。</li>
-                            <li>5分体験では「答え」を押すと、発表用に次に触る場所が光ります。</li>
-                        </ul>
-                    </section>
-                    <section>
-                        <h3>勝利条件</h3>
-                        <p>証拠と証言の食い違いを見つけ、決定的証拠に基づく推理を提出できれば事件解決です。完璧な文章より、誰が何をなぜ行ったかを筋道立てて入力することが重要です。</p>
-                    </section>
+                <div class="dossier-grid">
+                    <div><strong id="evidenceCount">0</strong><span>証拠</span></div>
+                    <div><strong id="testimonyCount">0</strong><span>証言</span></div>
+                    <div><strong id="peopleCount">0</strong><span>人物</span></div>
+                    <div><strong id="miniCount">0</strong><span>捜査結果</span></div>
                 </div>
+                <div class="dossier-block grow">
+                    <div class="panel-mini-heading">
+                        <span class="hud-kicker">People</span>
+                        <strong>容疑者・関係者</strong>
+                    </div>
+                    <div class="compact-list" id="peopleList"></div>
+                </div>
+            </aside>
+
+            <section class="game-main">
+                <div class="scene-feed">
+                    <span class="hud-kicker" id="sceneKicker">Opening</span>
+                    <h2 id="sceneHeadline">事件開始</h2>
+                    <p id="sceneNarrative">事件を読み込み中です。</p>
+                    <p class="deduction-note" id="currentDeduction">現在の推理状況はまだありません。</p>
+                </div>
+
+                <div class="action-console">
+                    <div class="panel-mini-heading">
+                        <span class="hud-kicker">Actions</span>
+                        <strong>ターン行動</strong>
+                    </div>
+                    <div class="action-grid" id="actionGrid"></div>
+                </div>
+
+                <div class="history-rail" id="historyRail"></div>
+            </section>
+
+            <aside class="game-board">
+                <div class="board-tabs">
+                    <button class="board-tab active" data-board-tab="evidence" type="button">証拠</button>
+                    <button class="board-tab" data-board-tab="testimony" type="button">証言</button>
+                    <button class="board-tab" data-board-tab="mini" type="button">結果</button>
+                </div>
+                <div class="board-pane" id="boardPane"></div>
+            </aside>
+        </section>
+    </main>
+
+    <section class="minigame-modal hidden" id="minigameModal" role="dialog" aria-modal="true">
+        <div class="minigame-card">
+            <header class="minigame-head">
+                <div>
+                    <span class="hud-kicker" id="miniTypeLabel">Mini Game</span>
+                    <h2 id="miniTitle">捜査ミニゲーム</h2>
+                </div>
+                <span class="mini-timer" id="miniTimer">00</span>
+            </header>
+            <div class="minigame-body" id="miniBody"></div>
+        </div>
+    </section>
+
+    <section class="final-modal hidden" id="finalModal" role="dialog" aria-modal="true">
+        <div class="final-card">
+            <header class="minigame-head">
+                <div>
+                    <span class="hud-kicker">Final Deduction</span>
+                    <h2>最終推理</h2>
+                </div>
+                <button class="hub-button ghost" id="finalCloseBtn" type="button">閉じる</button>
+            </header>
+            <div class="final-grid">
+                <label>犯人<select id="finalCulprit"></select></label>
+                <label>動機<select id="finalMotive"></select></label>
+                <label>トリック<select id="finalTrick"></select></label>
+                <label>決定的証拠<select id="finalEvidence"></select></label>
+            </div>
+            <button class="hub-button primary" id="submitFinalBtn" type="button">推理を提出</button>
+            <p class="final-result" id="finalResult">全証拠と証言をもとに組み合わせてください。</p>
+        </div>
+    </section>
+
+    <section class="case-result-modal hidden" id="caseResultModal" role="dialog" aria-modal="true">
+        <div class="case-result-card">
+            <header class="minigame-head">
+                <div>
+                    <span class="hud-kicker">Case Closed</span>
+                    <h2 id="resultTitle">事件解決</h2>
+                </div>
+                <button class="hub-button primary" id="resultBackOfficeBtn" type="button">事務所へ戻る</button>
+            </header>
+            <div class="result-layout">
+                <section class="result-summary">
+                    <span class="hud-kicker">Truth</span>
+                    <p id="resultTruth"></p>
+                </section>
+                <section class="result-summary">
+                    <span class="hud-kicker">Mini Game Results</span>
+                    <div class="compact-list" id="resultMiniList"></div>
+                </section>
             </div>
         </div>
-        <div class="status" id="status">Ready</div>
-    </div>
-
-    <script>
-        const presets = document.querySelectorAll('.preset');
-        const setupPanel = document.getElementById('setupPanel');
-        const scenePanel = document.getElementById('scenePanel');
-        const howToBtn = document.getElementById('howToBtn');
-        const howToDetailBtn = document.getElementById('howToDetailBtn');
-        const howToOverlay = document.getElementById('howToOverlay');
-        const howToCloseBtn = document.getElementById('howToCloseBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
-        const settingsPanel = document.getElementById('settingsPanel');
-        const themeSelect = document.getElementById('themeSelect');
-        const swatchRow = document.getElementById('swatchRow');
-        const soundToggle = document.getElementById('soundToggle');
-        const startBtn = document.getElementById('startBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const saveBtn = document.getElementById('saveBtn');
-        const loadBtn = document.getElementById('loadBtn');
-        const replayBtn = document.getElementById('replayBtn');
-        const loading = document.getElementById('loading');
-        const generationOverlay = document.getElementById('generationOverlay');
-        const fxLayer = document.getElementById('fxLayer');
-        const actionToast = document.getElementById('actionToast');
-        const endingOverlay = document.getElementById('endingOverlay');
-        const endingTitle = document.getElementById('endingTitle');
-        const endingText = document.getElementById('endingText');
-        const endingArchiveBtn = document.getElementById('endingArchiveBtn');
-        const endingReplayBtn = document.getElementById('endingReplayBtn');
-        const endingCloseBtn = document.getElementById('endingCloseBtn');
-        const statusEl = document.getElementById('status');
-        const choiceList = document.getElementById('choiceList');
-        const evidenceList = document.getElementById('evidenceList');
-        const testimonyList = document.getElementById('testimonyList');
-        const characterList = document.getElementById('characterList');
-        const testimonySelect = document.getElementById('testimonySelect');
-        const evidenceSelect = document.getElementById('evidenceSelect');
-        const contradictionResult = document.getElementById('contradictionResult');
-        const solvedContradictionList = document.getElementById('solvedContradictionList');
-        const deductionPanel = document.getElementById('deductionPanel');
-        const decisiveEvidenceSelect = document.getElementById('decisiveEvidenceSelect');
-        const submitDeductionBtn = document.getElementById('submitDeductionBtn');
-        const checkContradictionBtn = document.getElementById('checkContradictionBtn');
-        const demoBrief = document.getElementById('demoBrief');
-        const assistToolbar = document.getElementById('assistToolbar');
-        const assistGuide = document.getElementById('assistGuide');
-        const hintBtn = document.getElementById('hintBtn');
-        const answerBtn = document.getElementById('answerBtn');
-        const evidenceStrip = document.getElementById('evidenceStrip');
-        const recapPanel = document.getElementById('recapPanel');
-        const recapTimeline = document.getElementById('recapTimeline');
-        const motiveOptionList = document.getElementById('motiveOptionList');
-        const trickOptionList = document.getElementById('trickOptionList');
-        const caseArchiveList = document.getElementById('caseArchiveList');
-        const clearArchiveBtn = document.getElementById('clearArchiveBtn');
-
-        const demoVariants = [
-            '犯人候補は店員ユイ、常連客レン、配達員マオ。鍵、レシート、粉砂糖、保冷バッグのどれかが決定的証拠になる。',
-            '犯人候補は見習い店員、写真部の常連、急いでいた配達員。動機はサプライズ、予約ミスの隠蔽、アレルギー表示の確認のいずれか。',
-            '消えたものは限定マカロン、試作品タルト、名前入りクッキーのどれか。監視カメラ、トング、注文票、紙袋の矛盾を中心にする。',
-            '舞台は小さな駅前カフェ。閉店前の10分間だけを扱い、短い証言の食い違いから真相に届く構成にする。'
-        ];
-
-        const motiveOptions = [
-            '予約ミスを隠したかった',
-            '大切な相手への差し入れを用意したかった',
-            '自分の失敗が見つかる前に証拠を動かしたかった',
-            '誰かをかばうために事実をずらしたかった',
-            '記録の間違いを直したように見せたかった'
-        ];
-
-        const trickOptions = [
-            '死角になる一瞬を使って別の袋へ移した',
-            '元の場所へ戻したように見せるためラベルや札だけを直した',
-            '注文票や記録を書き換えて数を合わせた',
-            '持ち物の中に隠し、空箱や皿だけを残した',
-            '証言の時刻をずらして触っていないように見せた'
-        ];
-
-        const demoCaseTemplates = [
-            {
-                title: '消えた放課後マカロン',
-                location: '駅前カフェ・リュンヌ',
-                item: '夕焼けマカロン',
-                culprit: '常連客・花森',
-                motive: '友人への差し入れをどうしても用意したかった',
-                trick: 'ショーケース前で背中を向け、カメラの死角で紙袋へ移した',
-                keyEvidenceId: 'ev-bag-sugar',
-                evidence: [
-                    { id: 'ev-camera-gap', title: '死角のある映像', detail: '16時17分、常連客の背中でショーケース右端が一瞬だけ隠れている。', type: '記録', importance: 2 },
-                    { id: 'ev-order-tea', title: 'アイスティーだけの注文票', detail: '花森の注文票には飲み物だけが記録され、マカロンの会計は残っていない。', type: '記録', importance: 2 },
-                    { id: 'ev-bag-sugar', title: '紙袋の粉砂糖', detail: '花森の紙袋の底に、マカロン皿と同じ色の粉砂糖が半月形に残っている。', type: '物証', importance: 3 }
-                ],
-                testimonies: [
-                    { id: 'ts-staff', speaker: '店員・仁科', claim: '最後のマカロンは16時10分に並べ、会計した覚えはありません。' },
-                    { id: 'ts-customer', speaker: '常連客・花森', claim: '私は飲み物だけ買って、ショーケースには触っていません。' }
-                ]
-            },
-            {
-                title: '試作品タルトの行き先',
-                location: '放課後の試食カフェ',
-                item: '試作品タルト',
-                culprit: '見習い店員・レン',
-                motive: '予約数のミスを隠したかった',
-                trick: '試作品を予約箱へ入れ、注文票の数字を書き直した',
-                keyEvidenceId: 'ev-ticket-edit',
-                evidence: [
-                    { id: 'ev-empty-tray', title: 'クリーム跡の残る皿', detail: 'タルト皿の右端だけクリームが引き伸ばされ、横へ滑らせた跡がある。', type: '痕跡', importance: 2 },
-                    { id: 'ev-box-label', title: '急いで貼られた予約ラベル', detail: '予約箱のラベルだけ斜めに貼られ、まだ糊が乾いていない。', type: '物証', importance: 2 },
-                    { id: 'ev-ticket-edit', title: '書き直された注文票', detail: '注文票の個数が5から6へ書き直され、レンのペンと同じ青インクが使われている。', type: '記録', importance: 3 }
-                ],
-                testimonies: [
-                    { id: 'ts-senior', speaker: '先輩店員・ユイ', claim: '試作品タルトは展示用で、予約箱には入れない決まりです。' },
-                    { id: 'ts-apprentice', speaker: '見習い店員・レン', claim: '予約票は最初から6個で、僕は書き直していません。' }
-                ]
-            },
-            {
-                title: '名前入りクッキーのすり替え',
-                location: '文化祭前の校内カフェ',
-                item: '名前入りクッキー',
-                culprit: '配達員・マオ',
-                motive: '宛名を間違えた箱を入れ替えたかった',
-                trick: '配達用保冷バッグにクッキーを隠し、空箱だけ戻した',
-                keyEvidenceId: 'ev-cooler-crumb',
-                evidence: [
-                    { id: 'ev-name-card', title: '逆向きの名前札', detail: 'クッキー横の名前札だけ上下が逆で、慌てて戻したように角が折れている。', type: '記録', importance: 2 },
-                    { id: 'ev-empty-box', title: '軽すぎる配送箱', detail: '配送箱は封が戻されているが、中身が入っている重さではない。', type: '物証', importance: 2 },
-                    { id: 'ev-cooler-crumb', title: '保冷バッグのクッキー片', detail: 'マオの保冷バッグ内に、名前入りクッキーと同じアイシング片が残っている。', type: '物証', importance: 3 }
-                ],
-                testimonies: [
-                    { id: 'ts-delivery-a', speaker: '配達員・マオ', claim: '僕は箱を置いただけで、中身には触っていません。' },
-                    { id: 'ts-clerk-b', speaker: '店員・ユイ', claim: '名前札は開店前に正しい向きで並べました。' }
-                ]
-            }
-        ];
-
-        const caseFileVariants = {
-            demo: [
-                {
-                    label: '5分体験: 消えたマカロン',
-                    summary: 'AI待ちなし。証拠、矛盾、推理提出まで一気に見せられる。',
-                    world: '紹介用の体験版。放課後のカフェで、ショーケースから限定マカロンが1つ消えた小さな謎解きミステリー。登場人物は店員、常連客、配達員の3人程度。証拠と証言の矛盾が分かりやすく、3〜4ターンで犯人・動機・決定的証拠まで推理できる。'
-                },
-                {
-                    label: '5分体験: 消えた試作品',
-                    summary: '発表向け。予約ミスと書き直し跡から真相へ進む。',
-                    world: '紹介用の体験版。小さなカフェで試作品スイーツが消えた短い謎解きミステリー。注文票、予約箱、証言の矛盾から3〜4ターンで解ける。'
-                },
-                {
-                    label: '5分体験: 空の配送箱',
-                    summary: '短時間デモ用。持ち物の痕跡で嘘を見抜く。',
-                    world: '紹介用の体験版。校内カフェで名前入りのお菓子が消え、配送箱と持ち物の痕跡から犯人を見つける短い事件。'
-                }
-            ],
-            aquarium: [
-                {
-                    label: '消えた水槽のSOS',
-                    summary: '閉館後の水族館、点滅する光、濡れた足跡。',
-                    world: '閉館後の水族館で、存在しないはずの水槽からSOSの光が点滅する謎解きミステリー'
-                },
-                {
-                    label: '深海回廊の青い合図',
-                    summary: '展示図にない壁、青い点滅、乾いた床の水跡。',
-                    world: '閉館後の深海回廊で、展示図にない壁の奥から青い信号が漏れる水族館ミステリー'
-                },
-                {
-                    label: '空の水槽に残る泡',
-                    summary: '誰もいない展示室、泡の音、消えた飼育記録。',
-                    world: '夜の水族館で、空のはずの水槽から泡の音が聞こえ、飼育記録が一枚消える謎解きミステリー'
-                }
-            ],
-            school: [
-                {
-                    label: '未来放送の夜',
-                    summary: '文化祭、放送室、まだ起きていない事件。',
-                    world: '文化祭前夜の学校で、誰もいない放送室から未来の校内放送が流れる謎解きミステリー'
-                },
-                {
-                    label: '未送信の校内放送',
-                    summary: '録音室、時刻のずれ、消えた台本。',
-                    world: '文化祭準備中の学校で、送信していないはずの校内放送と消えた台本を追う謎解きミステリー'
-                },
-                {
-                    label: '体育館だけが知っている',
-                    summary: 'リハーサル後、照明卓、未来の呼び出し音。',
-                    world: '文化祭リハーサル後の体育館で、未来の呼び出し放送が流れた理由を探る学校ミステリー'
-                }
-            ],
-            hotel: [
-                {
-                    label: '13階の招待状',
-                    summary: '古いホテル、存在しない階、差出人不明の鍵。',
-                    world: '古いホテルのエレベーターで、13階だけ存在しないはずなのにボタンが光る謎解きミステリー'
-                },
-                {
-                    label: '存在しない客室番号',
-                    summary: '夜のフロント、古い鍵束、消えた宿泊記録。',
-                    world: '古いホテルで、存在しない客室番号の鍵と消えた宿泊記録を追う謎解きミステリー'
-                },
-                {
-                    label: '止まらない13階ランプ',
-                    summary: 'エレベーター、点灯する階数、誰も乗っていない箱。',
-                    world: '誰も乗っていないホテルのエレベーターで、存在しない13階ランプだけが点灯し続ける謎解きミステリー'
-                }
-            ]
-        };
-
-        const state = {
-            world: document.querySelector('.preset.selected').dataset.world,
-            baseWorld: document.querySelector('.preset.selected').dataset.world,
-            caseName: document.querySelector('.preset.selected').dataset.case,
-            hero: '',
-            tone: '',
-            turn: 1,
-            history: 'まだ物語は始まっていない。',
-            lastChoice: '捜査を開始する',
-            stats: { clues: 0, logic: 0, suspicion: 0 },
-            evidence: [],
-            testimonies: [],
-            contradictions: [],
-            solvedContradictions: [],
-            characters: [],
-            solution: null,
-            demoVariant: '',
-            demoCase: null,
-            demoCaseIndex: -1,
-            hints: [],
-            hintIndex: 0,
-            recap: null,
-            currentScene: null,
-            soundEnabled: true
-        };
-
-        document.body.classList.add('theme-noir');
-        randomizeCaseFiles();
-        initDeductionOptionChips();
-        renderCaseArchive();
-
-        howToBtn.addEventListener('click', showHowTo);
-        howToDetailBtn.addEventListener('click', showHowTo);
-        howToCloseBtn.addEventListener('click', hideHowTo);
-        howToOverlay.addEventListener('click', (event) => {
-            if (event.target === howToOverlay) {
-                hideHowTo();
-            }
-        });
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !howToOverlay.classList.contains('hidden')) {
-                hideHowTo();
-            }
-        });
-
-        settingsBtn.addEventListener('click', () => {
-            settingsPanel.classList.toggle('hidden');
-            playSound('click');
-        });
-
-        themeSelect.addEventListener('change', () => {
-            document.body.classList.remove('theme-noir', 'theme-neon', 'theme-sunset', 'theme-mint');
-            document.body.classList.add(themeSelect.value);
-            playSound('click');
-        });
-
-        swatchRow.addEventListener('click', (event) => {
-            const swatch = event.target.closest('.swatch');
-            if (!swatch) return;
-            document.documentElement.style.setProperty('--accent', swatch.dataset.accent);
-            swatchRow.querySelectorAll('.swatch').forEach((item) => item.classList.remove('selected'));
-            swatch.classList.add('selected');
-            playSound('click');
-        });
-
-        soundToggle.addEventListener('change', () => {
-            state.soundEnabled = soundToggle.checked;
-            playSound('click');
-        });
-
-        saveBtn.addEventListener('click', saveGame);
-        loadBtn.addEventListener('click', loadGame);
-        replayBtn.addEventListener('click', replayCase);
-        endingReplayBtn.addEventListener('click', replayCase);
-        endingArchiveBtn.addEventListener('click', () => {
-            endingOverlay.classList.add('hidden');
-            resetBtn.click();
-            renderCaseArchive();
-        });
-        endingCloseBtn.addEventListener('click', () => {
-            endingOverlay.classList.add('hidden');
-            playSound('click');
-        });
-        clearArchiveBtn.addEventListener('click', () => {
-            localStorage.removeItem('mysteryCaseArchive');
-            renderCaseArchive();
-            showToast('事件ファイルを整理しました');
-            playSound('click');
-        });
-
-        presets.forEach((preset) => {
-            preset.addEventListener('click', () => {
-                presets.forEach((item) => item.classList.remove('selected'));
-                preset.classList.add('selected');
-                state.world = preset.dataset.world;
-                state.baseWorld = preset.dataset.world;
-                state.caseName = preset.dataset.case;
-                updateCaseTheme(preset.dataset.case, preset.dataset.label);
-                playSound('click');
-            });
-        });
-
-        function randomizeCaseFiles() {
-            presets.forEach((preset) => {
-                const options = caseFileVariants[preset.dataset.case];
-                if (!options || !options.length) return;
-                const variant = options[Math.floor(Math.random() * options.length)];
-                preset.dataset.label = variant.label;
-                preset.dataset.world = variant.world;
-                preset.dataset.caseCode = Math.random().toString(36).slice(2, 7).toUpperCase();
-                preset.querySelector('strong').textContent = variant.label;
-                preset.querySelector('span').textContent = variant.summary;
-            });
-
-            const selected = document.querySelector('.preset.selected');
-            state.world = selected.dataset.world;
-            state.baseWorld = selected.dataset.world;
-            state.caseName = selected.dataset.case;
-            updateCaseTheme(selected.dataset.case, selected.dataset.label);
-        }
-
-        startBtn.addEventListener('click', () => {
-            const selectedPreset = document.querySelector('.preset.selected');
-            state.caseName = selectedPreset.dataset.case;
-            state.baseWorld = selectedPreset.dataset.world;
-            state.demoVariant = state.caseName === 'demo' ? pickDemoVariant() : '';
-            state.demoCase = state.caseName === 'demo' ? pickLocalDemoCase() : null;
-            state.world = state.demoVariant
-                ? state.baseWorld + '\n今回のランダム要素: ' + state.demoVariant + '\n紹介中でも毎回プロットが変わったと分かるよう、犯人・動機・決定的証拠を前回と変える。'
-                : state.baseWorld;
-            state.hero = document.getElementById('heroInput').value.trim() || '名もなき主人公';
-            state.tone = document.getElementById('toneSelect').value;
-            state.turn = 1;
-            state.history = 'まだ物語は始まっていない。';
-            state.lastChoice = '捜査を開始する';
-            state.stats = { clues: 0, logic: 0, suspicion: 0 };
-            state.characters = [];
-            state.solution = null;
-            state.hints = [];
-            state.hintIndex = 0;
-            state.recap = null;
-            state.currentScene = null;
-            endingOverlay.classList.add('hidden');
-            clearCaseBoard();
-            updateStats();
-            hideRecap();
-            setAssistGuide('捜査サポート', '生成後に「ヒント」で段階的な助言を見られます。体験版では「答え」も使えます。');
-            playSound('start');
-            requestScene();
-        });
-
-        resetBtn.addEventListener('click', () => {
-            state.turn = 1;
-            state.history = 'まだ物語は始まっていない。';
-            state.lastChoice = '捜査を開始する';
-            state.stats = { clues: 0, logic: 0, suspicion: 0 };
-            state.characters = [];
-            state.solution = null;
-            state.demoVariant = '';
-            state.demoCase = null;
-            state.demoCaseIndex = -1;
-            state.hints = [];
-            state.hintIndex = 0;
-            state.recap = null;
-            state.currentScene = null;
-            endingOverlay.classList.add('hidden');
-            setupPanel.classList.remove('hidden');
-            scenePanel.classList.add('hidden');
-            choiceList.innerHTML = '';
-            clearHighlights();
-            clearCaseBoard();
-            hideRecap();
-            updateStats();
-            statusEl.textContent = 'Ready';
-            statusEl.style.color = '#28a745';
-            playSound('click');
-        });
-
-        checkContradictionBtn.addEventListener('click', checkContradiction);
-        submitDeductionBtn.addEventListener('click', submitDeduction);
-        hintBtn.addEventListener('click', showHint);
-        answerBtn.addEventListener('click', showDemoAnswer);
-
-        async function requestScene(choiceLabel) {
-            if (choiceLabel) {
-                state.lastChoice = choiceLabel;
-                state.turn += 1;
-            }
-
-            if (state.caseName === 'demo' && state.demoCase) {
-                renderScene(buildLocalDemoScene(choiceLabel));
-                return;
-            }
-
-            setBusy(true);
-            try {
-                const response = await fetch('/api/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        app: 'story',
-                        title: 'AI謎解きストーリー',
-                        world: state.world,
-                        hero: state.hero,
-                        tone: state.tone,
-                        turn: state.turn,
-                        choice: state.lastChoice,
-                        history: state.history,
-                        caseBoard: buildCaseBoardSummary()
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    let message = errorText || response.statusText;
-                    try {
-                        const error = JSON.parse(errorText);
-                        message = error.error || message;
-                    } catch (parseError) {
-                        message = errorText || response.statusText;
-                    }
-                    throw new Error(message);
-                }
-
-                const payload = await response.json();
-                const scene = payload.data && payload.data[0];
-                if (!scene || !Array.isArray(scene.choices)) {
-                    throw new Error('Invalid story data format');
-                }
-
-                renderScene(scene);
-            } catch (error) {
-                console.error(error);
-                statusEl.textContent = 'AI生成に失敗しました。Renderの環境変数とAPIキーを確認してください: ' + error.message;
-                statusEl.style.color = '#c53030';
-                showToast('AI生成に失敗しました');
-            } finally {
-                setBusy(false);
-            }
-        }
-
-        function renderScene(scene) {
-            state.currentScene = scene;
-            setupPanel.classList.add('hidden');
-            scenePanel.classList.remove('hidden');
-
-            document.getElementById('turnPill').textContent = 'Turn ' + state.turn;
-            document.getElementById('locationPill').textContent = scene.location || 'Unknown';
-            document.getElementById('moodPill').textContent = scene.mood || 'Story';
-            document.getElementById('sceneTitle').textContent = scene.sceneTitle || '次の場面';
-            revealSceneText(scene.scene || '');
-            document.getElementById('sceneCommand').textContent = state.lastChoice || '現場解析';
-            document.getElementById('sceneFeedLabel').textContent = scene.location || 'Evidence feed';
-            scenePanel.classList.remove('scene-pop');
-            void scenePanel.offsetWidth;
-            scenePanel.classList.add('scene-pop');
-
-            clearHighlights();
-            state.solution = scene.solution || state.solution;
-            state.hints = Array.isArray(scene.hints) ? scene.hints.filter(Boolean) : buildFallbackHints();
-            state.hintIndex = 0;
-            state.recap = scene.recap || state.recap;
-            addCaseItems(scene);
-            applyStatus(scene.status);
-            state.history = scene.memory || state.history;
-            updateStats();
-            renderCaseBoard();
-            renderVisualOverview();
-            renderRecap(scene);
-
-            choiceList.innerHTML = '';
-            if (scene.ending) {
-                const ending = document.createElement('button');
-                ending.className = 'choice-button';
-                ending.innerHTML = '<strong>別の物語を始める</strong><span>世界観を選び直します。</span>';
-                ending.addEventListener('click', () => resetBtn.click());
-                choiceList.appendChild(ending);
-            } else {
-                scene.choices.slice(0, 3).forEach((choice, index) => {
-                    const button = document.createElement('button');
-                    button.className = 'choice-button';
-                    button.innerHTML = '<span class="choice-index"></span><span class="choice-copy"><strong></strong><span></span></span><span class="intent-chip"></span>';
-                    button.querySelector('.choice-index').textContent = String(index + 1);
-                    button.querySelector('strong').textContent = choice.label || '行動する';
-                    button.querySelector('.choice-copy span').textContent = choice.intent || 'この選択で物語が進みます。';
-                    button.querySelector('.intent-chip').textContent = choice.intent || '行動';
-                    button.addEventListener('click', (event) => {
-                        ripple(event, button);
-                        showToast('調査開始: ' + (choice.intent || '行動'));
-                        requestScene(choice.label);
-                    });
-                    choiceList.appendChild(button);
-                });
-            }
-
-            statusEl.textContent = '選択するとAIが次の手がかりを生成します';
-            statusEl.style.color = '#2f855a';
-            renderAssistMode();
-            playSound(scene.ending ? 'ending' : 'scene');
-        }
-
-        function addCaseItems(scene) {
-            addUniqueItems(state.evidence, scene.evidence, 'id');
-            addUniqueItems(state.testimonies, scene.testimonies, 'id');
-            addUniqueItems(state.contradictions, scene.contradictions, (item) => {
-                return item.testimonyId + '::' + item.evidenceId;
-            });
-            updateCharacters(scene);
-        }
-
-        function addUniqueItems(target, items, key) {
-            if (!Array.isArray(items)) return;
-            items.forEach((item) => {
-                if (!item || typeof item !== 'object') return;
-                const id = typeof key === 'function' ? key(item) : item[key];
-                if (!id || target.some((current) => {
-                    const currentId = typeof key === 'function' ? key(current) : current[key];
-                    return currentId === id;
-                })) {
-                    return;
-                }
-                target.push(item);
-            });
-        }
-
-        function renderCaseBoard() {
-            document.getElementById('boardCount').textContent = state.evidence.length + state.testimonies.length + '件';
-            renderEvidence();
-            renderTestimonies();
-            renderCharacters();
-            renderSelectors();
-            renderSolvedContradictions();
-            renderDeductionPanel();
-            renderVisualOverview();
-        }
-
-        function renderEvidence() {
-            evidenceList.innerHTML = '';
-            if (!state.evidence.length) {
-                evidenceList.appendChild(emptyItem('まだ証拠はありません。'));
-                return;
-            }
-
-            state.evidence.forEach((item) => {
-                const node = document.createElement('article');
-                node.className = 'board-card';
-                node.innerHTML = '<div><strong></strong><span></span></div><p></p>';
-                node.querySelector('strong').textContent = item.title || '無名の証拠';
-                node.querySelector('span').textContent = (item.type || '証拠') + ' / 重要度' + (item.importance || 1);
-                node.querySelector('p').textContent = item.detail || '';
-                node.addEventListener('click', () => {
-                    evidenceSelect.value = item.id || item.title;
-                    flashElement(evidenceSelect);
-                    showToast('証拠をセット: ' + (item.title || '証拠'));
-                    playSound('click');
-                });
-                evidenceList.appendChild(node);
-            });
-        }
-
-        function renderTestimonies() {
-            testimonyList.innerHTML = '';
-            if (!state.testimonies.length) {
-                testimonyList.appendChild(emptyItem('まだ証言はありません。'));
-                return;
-            }
-
-            state.testimonies.forEach((item) => {
-                const node = document.createElement('article');
-                node.className = 'board-card testimony-card';
-                node.innerHTML = '<div><strong></strong><span>証言</span></div><p></p>';
-                node.querySelector('strong').textContent = item.speaker || '証言者不明';
-                node.querySelector('p').textContent = item.claim || '';
-                node.addEventListener('click', () => {
-                    testimonySelect.value = item.id || item.claim;
-                    flashElement(testimonySelect);
-                    showToast('証言をセット: ' + (item.speaker || '証言者'));
-                    playSound('click');
-                });
-                testimonyList.appendChild(node);
-            });
-        }
-
-        function updateCharacters(scene) {
-            const names = [];
-            if (state.demoCase) {
-                names.push(state.demoCase.culprit);
-                state.demoCase.testimonies.forEach((item) => names.push(item.speaker));
-            }
-            if (Array.isArray(scene.testimonies)) {
-                scene.testimonies.forEach((item) => names.push(item.speaker));
-            }
-            if (scene.solution && scene.solution.culprit) {
-                names.push(scene.solution.culprit);
-            }
-
-            names.filter(Boolean).forEach((name) => {
-                if (state.characters.some((item) => item.name === name)) return;
-                state.characters.push({
-                    name,
-                    note: name === (state.solution && state.solution.culprit) ? '最重要人物' : '証言あり',
-                    suspicion: name === (state.solution && state.solution.culprit) ? 3 : 1
-                });
-            });
-        }
-
-        function renderCharacters() {
-            characterList.innerHTML = '';
-            if (!state.characters.length) {
-                characterList.appendChild(emptyItem('人物情報はまだありません。'));
-                return;
-            }
-
-            state.characters.forEach((person) => {
-                const card = document.createElement('article');
-                card.className = 'character-card';
-                card.innerHTML = '<div class="avatar"></div><div><strong></strong><span></span></div><i></i>';
-                card.querySelector('.avatar').textContent = person.name.slice(0, 1);
-                card.querySelector('strong').textContent = person.name;
-                card.querySelector('span').textContent = person.note || '調査対象';
-                card.querySelector('i').style.width = Math.min(100, 28 + person.suspicion * 22) + '%';
-                card.addEventListener('click', () => {
-                    document.getElementById('culpritInput').value = person.name;
-                    flashElement(document.getElementById('culpritInput'));
-                    showToast('人物を推理欄へ: ' + person.name);
-                    playSound('click');
-                });
-                characterList.appendChild(card);
-            });
-        }
-
-        function renderSelectors() {
-            fillSelect(testimonySelect, state.testimonies, (item) => {
-                return (item.speaker || '証言者') + ': ' + (item.claim || '').slice(0, 28);
-            }, '証言を選択');
-            fillSelect(evidenceSelect, state.evidence, (item) => item.title || '証拠', '証拠を選択');
-            fillSelect(decisiveEvidenceSelect, state.evidence, (item) => item.title || '証拠', '証拠を選択');
-            checkContradictionBtn.disabled = !state.testimonies.length || !state.evidence.length;
-        }
-
-        function fillSelect(select, items, labeler, placeholder) {
-            select.innerHTML = '';
-            const first = document.createElement('option');
-            first.value = '';
-            first.textContent = placeholder;
-            select.appendChild(first);
-            items.forEach((item) => {
-                const option = document.createElement('option');
-                option.value = item.id || item.title || item.claim;
-                option.textContent = labeler(item);
-                select.appendChild(option);
-            });
-        }
-
-        function checkContradiction() {
-            const testimonyId = testimonySelect.value;
-            const evidenceId = evidenceSelect.value;
-            if (!testimonyId || !evidenceId) {
-                contradictionResult.textContent = '証言と証拠を両方選んでください。';
-                contradictionResult.className = 'contradiction-result';
-                return;
-            }
-
-            const contradiction = state.contradictions.find((item) => {
-                return item.testimonyId === testimonyId && item.evidenceId === evidenceId;
-            });
-
-            if (!contradiction) {
-                state.stats.logic = Math.max(-9, state.stats.logic - 1);
-                updateStats();
-                contradictionResult.textContent = 'この組み合わせだけでは矛盾を指摘できません。別の証拠を試してください。';
-                contradictionResult.className = 'contradiction-result miss';
-                shakeScreen();
-                showToast('不一致: 別の組み合わせを試そう');
-                playSound('miss');
-                return;
-            }
-
-            clearHighlights();
-            const key = contradiction.testimonyId + '::' + contradiction.evidenceId;
-            if (!state.solvedContradictions.some((item) => item.key === key)) {
-                state.solvedContradictions.push({ key, explanation: contradiction.explanation });
-                state.stats.logic = Math.min(9, state.stats.logic + 2);
-                updateStats();
-            }
-
-            contradictionResult.textContent = contradiction.explanation || '証言と証拠が食い違っています。';
-            contradictionResult.className = 'contradiction-result hit';
-            burstParticles(checkContradictionBtn, 26);
-            showToast('矛盾発見');
-            playSound('success');
-            renderSolvedContradictions();
-            renderDeductionPanel();
-            renderVisualOverview();
-            setAssistGuide('矛盾発見', '証言と証拠をぶつけると、隠れていた食い違いが見えます。');
-        }
-
-        function renderSolvedContradictions() {
-            solvedContradictionList.innerHTML = '';
-            state.solvedContradictions.forEach((item) => {
-                const node = document.createElement('div');
-                node.className = 'solved-item';
-                node.textContent = item.explanation;
-                solvedContradictionList.appendChild(node);
-            });
-        }
-
-        function renderDeductionPanel() {
-            const canDeduce = state.turn >= 4 || state.evidence.length >= 4 || state.solvedContradictions.length >= 1;
-            deductionPanel.classList.toggle('hidden', !canDeduce);
-            document.getElementById('deductionHint').textContent = canDeduce
-                ? '犯人・動機・トリック・証拠をそろえて提出'
-                : 'Turn 4以降、または矛盾発見後に提出できます';
-            submitDeductionBtn.disabled = !canDeduce || !state.evidence.length;
-        }
-
-        function initDeductionOptionChips() {
-            renderOptionChips(motiveOptionList, motiveOptions, document.getElementById('motiveInput'));
-            renderOptionChips(trickOptionList, trickOptions, document.getElementById('trickInput'));
-        }
-
-        function renderOptionChips(container, options, target) {
-            container.innerHTML = '';
-            options.forEach((option) => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'option-chip';
-                button.textContent = option;
-                button.addEventListener('click', () => {
-                    target.value = option;
-                    flashElement(target);
-                    showToast('候補を入力しました');
-                    playSound('click');
-                });
-                container.appendChild(button);
-            });
-        }
-
-        function renderVisualOverview() {
-            const evidenceCount = state.evidence.length;
-            const testimonyCount = state.testimonies.length;
-            const contradictionCount = state.solvedContradictions.length;
-            document.getElementById('visualEvidenceCount').textContent = evidenceCount;
-            document.getElementById('visualTestimonyCount').textContent = testimonyCount;
-            document.getElementById('visualContradictionCount').textContent = contradictionCount;
-            document.getElementById('progressEvidence').classList.toggle('active', evidenceCount > 0);
-            document.getElementById('progressTestimony').classList.toggle('active', testimonyCount > 0);
-            document.getElementById('progressContradiction').classList.toggle('active', contradictionCount > 0);
-
-            evidenceStrip.innerHTML = '';
-            const items = state.evidence.slice(-5);
-            if (!items.length) {
-                const empty = document.createElement('span');
-                empty.className = 'evidence-chip muted';
-                empty.textContent = '証拠待ち';
-                evidenceStrip.appendChild(empty);
-                return;
-            }
-
-            items.forEach((item) => {
-                const chip = document.createElement('span');
-                chip.className = 'evidence-chip';
-                chip.textContent = item.title || '証拠';
-                evidenceStrip.appendChild(chip);
-            });
-        }
-
-        function submitDeduction() {
-            const culprit = document.getElementById('culpritInput').value.trim();
-            const motive = document.getElementById('motiveInput').value.trim();
-            const trick = document.getElementById('trickInput').value.trim();
-            const evidenceId = decisiveEvidenceSelect.value;
-            const evidence = state.evidence.find((item) => item.id === evidenceId);
-
-            if (!culprit || !motive || !trick || !evidenceId) {
-                statusEl.textContent = '最終推理には犯人・動機・トリック・決定的証拠が必要です';
-                statusEl.style.color = '#c53030';
-                return;
-            }
-
-            const label = [
-                '最終推理を提出する:',
-                '犯人「' + culprit + '」',
-                '動機「' + motive + '」',
-                'トリック「' + trick + '」',
-                '決定的証拠「' + (evidence ? evidence.title : evidenceId) + '」'
-            ].join(' ');
-            clearHighlights();
-            showToast('推理提出');
-            playSound('submit');
-            requestScene(label);
-        }
-
-        function buildCaseBoardSummary() {
-            const evidence = state.evidence.map((item) => {
-                return '- 証拠 ' + (item.id || '') + ': ' + (item.title || '') + ' / ' + (item.detail || '');
-            }).join('\n');
-            const testimonies = state.testimonies.map((item) => {
-                return '- 証言 ' + (item.id || '') + ': ' + (item.speaker || '') + '「' + (item.claim || '') + '」';
-            }).join('\n');
-            const solved = state.solvedContradictions.map((item) => '- 発見済み矛盾: ' + item.explanation).join('\n');
-            return [evidence, testimonies, solved].filter(Boolean).join('\n') || 'まだ証拠も証言もない。';
-        }
-
-        function clearCaseBoard() {
-            state.evidence = [];
-            state.testimonies = [];
-            state.contradictions = [];
-            state.solvedContradictions = [];
-            contradictionResult.textContent = '証言と証拠を選んで照合します。';
-            contradictionResult.className = 'contradiction-result';
-            renderCaseBoard();
-        }
-
-        function emptyItem(text) {
-            const node = document.createElement('div');
-            node.className = 'empty-board';
-            node.textContent = text;
-            return node;
-        }
-
-        function applyStatus(delta = {}) {
-            ['clues', 'logic', 'suspicion'].forEach((key) => {
-                const value = Number(delta[key] || 0);
-                state.stats[key] = Math.max(-9, Math.min(9, state.stats[key] + value));
-            });
-        }
-
-        function updateStats() {
-            setStat('courageStat', 'courageMeter', state.stats.clues);
-            setStat('witStat', 'witMeter', state.stats.logic);
-            setStat('trustStat', 'trustMeter', state.stats.suspicion);
-        }
-
-        function setStat(valueId, meterId, value) {
-            document.getElementById(valueId).textContent = value;
-            document.getElementById(meterId).style.width = Math.max(8, Math.min(100, ((value + 9) / 18) * 100)) + '%';
-        }
-
-        function updateCaseTheme(caseName, label) {
-            document.body.classList.remove('demo-case', 'aquarium-case', 'school-case', 'hotel-case');
-            document.body.classList.add((caseName || 'aquarium') + '-case');
-            document.getElementById('caseVisualTitle').textContent = label || '事件ファイル';
-            demoBrief.classList.toggle('hidden', caseName !== 'demo');
-        }
-
-        function renderAssistMode() {
-            const isDemo = state.caseName === 'demo';
-            assistToolbar.classList.remove('hidden');
-            answerBtn.classList.toggle('hidden', !isDemo);
-            if (isDemo && state.demoVariant) {
-                statusEl.textContent = '体験版: 今回の事件は毎回変わります。「答え」で紹介用の次操作を表示できます';
-                statusEl.style.color = '#2f855a';
-            }
-        }
-
-        function showHint() {
-            clearHighlights();
-            playSound('click');
-            const hints = state.hints.length ? state.hints : buildFallbackHints();
-            const hint = hints[Math.min(state.hintIndex, hints.length - 1)];
-            state.hintIndex = Math.min(state.hintIndex + 1, hints.length);
-            setAssistGuide('ヒント ' + Math.min(state.hintIndex, hints.length) + '/' + hints.length, hint);
-
-            if (state.hintIndex >= hints.length && state.contradictions.length) {
-                const contradiction = state.contradictions[0];
-                testimonySelect.value = contradiction.testimonyId;
-                evidenceSelect.value = contradiction.evidenceId;
-                highlightElements([testimonySelect, evidenceSelect, checkContradictionBtn]);
-                return;
-            }
-
-            if (state.evidence.length) {
-                const cards = evidenceList.querySelectorAll('.board-card');
-                highlightElements([cards[cards.length - 1]]);
-                return;
-            }
-
-            highlightElements([choiceList.querySelector('.choice-button')]);
-        }
-
-        function buildFallbackHints() {
-            const lastEvidence = state.evidence[state.evidence.length - 1];
-            const lastTestimony = state.testimonies[state.testimonies.length - 1];
-            return [
-                'まず新しく増えた証拠を見てください。',
-                lastEvidence ? '「' + lastEvidence.title + '」が手がかりです。' : '選択肢で調査を進めましょう。',
-                lastTestimony ? '証言と証拠を照合してみましょう。' : '次は誰かの証言を取りに行きましょう。'
-            ];
-        }
-
-        function buildLocalDemoScene(choiceLabel) {
-            const demo = state.demoCase;
-            if ((choiceLabel || '').includes('最終推理を提出する')) {
-                return buildLocalDemoEnding(demo);
-            }
-
-            const isSecondScene = state.turn >= 2;
-            const evidence = isSecondScene ? [demo.evidence[2]] : demo.evidence.slice(0, 2);
-            const testimonies = isSecondScene ? [demo.testimonies[1]] : [demo.testimonies[0]];
-            const contradictions = isSecondScene
-                ? [{
-                    testimonyId: demo.testimonies[1].id,
-                    evidenceId: demo.keyEvidenceId,
-                    explanation: '証言では触っていないはずなのに、決定的証拠が本人の持ち物から見つかっています。'
-                }]
-                : [];
-
-            return {
-                sceneTitle: isSecondScene ? '矛盾が浮かぶ決定的証拠' : demo.title,
-                location: demo.location,
-                mood: '発表モード: 待ち時間なしで進行',
-                scene: isSecondScene
-                    ? demo.culprit + 'の証言を確かめると、言葉とは反対に決定的な痕跡が出てきた。' + demo.evidence[2].title + 'は、消えた' + demo.item + 'が本人の近くへ移動したことを示している。証言と証拠を照合すれば、真相への道筋が見える。'
-                    : 'ミナトが捜査を始めると、' + demo.item + 'だけが消えていた。現場には「' + demo.evidence[0].title + '」と「' + demo.evidence[1].title + '」が残る。まずは証拠を見て、誰の証言と食い違うのかを探すとよさそうだ。',
-                evidence,
-                testimonies,
-                contradictions,
-                choices: [
-                    { label: '現場の痕跡を詳しく調べる', intent: '調べる' },
-                    { label: demo.culprit + 'に証言を確認する', intent: '問い詰める' },
-                    { label: '証拠のつながりを整理する', intent: '推理する' }
-                ],
-                hints: isSecondScene
-                    ? ['本人の持ち物に注目', '証言と決定的証拠を照合', '触っていない発言が崩れる']
-                    : ['消えた物の移動先を見る', '注文や持ち物を確認', '会計や記録がない人が怪しい'],
-                memory: demo.item + 'が消え、' + demo.evidence.map((item) => item.title).join('、') + 'が焦点。',
-                status: { clues: isSecondScene ? 1 : 2, logic: 1, suspicion: isSecondScene ? 2 : 1 },
-                solution: buildLocalDemoSolution(demo),
-                recap: emptyRecap(),
-                ending: false
-            };
-        }
-
-        function buildLocalDemoEnding(demo) {
-            return {
-                sceneTitle: '真相の整理',
-                location: demo.location,
-                mood: '推理完了',
-                scene: '提出された推理で、事件の筋道がつながった。' + demo.culprit + 'は' + demo.motive + 'ため、' + demo.trick + '。決め手は「' + demo.evidence[2].title + '」だった。',
-                evidence: [],
-                testimonies: [],
-                contradictions: [],
-                choices: [],
-                hints: ['まとめを確認', '決め手を見直す', '別事件でも遊べます'],
-                memory: demo.culprit + 'が' + demo.item + 'を動かした真相まで解決。',
-                status: { clues: 0, logic: 2, suspicion: -2 },
-                solution: buildLocalDemoSolution(demo),
-                recap: {
-                    verdict: '解決',
-                    timeline: [
-                        demo.item + 'が現場から消えた。',
-                        demo.culprit + 'の証言に違和感が出た。',
-                        '決定的証拠「' + demo.evidence[2].title + '」で移動先が分かった。'
-                    ],
-                    keyEvidence: demo.evidence[2].title + '。' + demo.evidence[2].detail,
-                    truth: demo.culprit + 'は' + demo.motive + 'ため、' + demo.trick + '。',
-                    playerComment: '証拠と証言の食い違いから、短時間で真相を組み立てられました。'
-                },
-                ending: true
-            };
-        }
-
-        function buildLocalDemoSolution(demo) {
-            return {
-                culprit: demo.culprit,
-                motive: demo.motive,
-                trick: demo.trick,
-                decisiveEvidenceId: demo.keyEvidenceId,
-                summary: demo.culprit + 'が' + demo.trick + '。決め手は「' + demo.evidence[2].title + '」。'
-            };
-        }
-
-        function emptyRecap() {
-            return { verdict: '', timeline: [], keyEvidence: '', truth: '', playerComment: '' };
-        }
-
-        function showDemoAnswer() {
-            clearHighlights();
-            playSound('click');
-            if (state.caseName !== 'demo') return;
-
-            const contradiction = state.contradictions.find((item) => {
-                const key = item.testimonyId + '::' + item.evidenceId;
-                return !state.solvedContradictions.some((solved) => solved.key === key);
-            });
-
-            if (contradiction) {
-                testimonySelect.value = contradiction.testimonyId;
-                evidenceSelect.value = contradiction.evidenceId;
-                highlightElements([testimonySelect, evidenceSelect, checkContradictionBtn]);
-                setAssistGuide('ここを押す', '証言と証拠を自動で選びました。次は「照合」を押すと、矛盾が見つかる体験を見せられます。');
-                checkContradictionBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return;
-            }
-
-            if (!deductionPanel.classList.contains('hidden') && state.solution) {
-                fillDemoSolution();
-                highlightElements([deductionPanel, submitDeductionBtn]);
-                setAssistGuide('ここを押す', '最終推理を入力しました。最後に「推理を提出する」を押すと、AIが推理を評価します。');
-                submitDeductionBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return;
-            }
-
-            const buttons = Array.from(choiceList.querySelectorAll('.choice-button'));
-            const preferred = buttons.find((button) => /問い|証言|聞|推理|矛盾|調べ/.test(button.textContent)) || buttons[0];
-            if (preferred) {
-                highlightElements([preferred]);
-                setAssistGuide('ここを押す', 'まずは行動カードを1つ選びます。AIが次の場面と新しい証拠を生成するので、毎回違う事件になります。');
-                preferred.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return;
-            }
-
-            highlightElements([startBtn]);
-            setAssistGuide('ここを押す', '「捜査を始める」から体験版を開始します。');
-        }
-
-        function fillDemoSolution() {
-            const solution = state.solution || {};
-            document.getElementById('culpritInput').value = solution.culprit || guessCulprit();
-            document.getElementById('motiveInput').value = solution.motive || '証言の食い違いを隠すため';
-            document.getElementById('trickInput').value = solution.trick || solution.summary || '証拠と証言の矛盾から、消えた時刻と触れた人物を特定する。';
-            const decisiveId = solution.decisiveEvidenceId && state.evidence.some((item) => item.id === solution.decisiveEvidenceId)
-                ? solution.decisiveEvidenceId
-                : (state.evidence[0] && state.evidence[0].id);
-            decisiveEvidenceSelect.value = decisiveId || '';
-        }
-
-        function guessCulprit() {
-            const testimony = state.testimonies[0];
-            return testimony ? testimony.speaker : '証言に矛盾した人物';
-        }
-
-        function renderRecap(scene) {
-            const recap = scene.recap || state.recap;
-            const shouldShow = scene.ending || (state.lastChoice || '').includes('最終推理を提出する');
-            if (!recap || !shouldShow) return;
-
-            recapPanel.classList.remove('hidden');
-            document.getElementById('recapVerdict').textContent = recap.verdict || '推理結果';
-            recapTimeline.innerHTML = '';
-            const timeline = Array.isArray(recap.timeline) ? recap.timeline : [];
-            timeline.slice(0, 4).forEach((item) => {
-                const li = document.createElement('li');
-                li.textContent = item;
-                recapTimeline.appendChild(li);
-            });
-            document.getElementById('recapEvidence').textContent = recap.keyEvidence || '決め手は、証拠と証言の食い違いです。';
-            document.getElementById('recapTruth').textContent = recap.truth || (state.solution && state.solution.summary) || '真相は推理の結果として整理されました。';
-            document.getElementById('recapComment').textContent = recap.playerComment || '証拠を組み合わせて、事件の筋道を説明できました。';
-            archiveSolvedCase(recap, scene);
-            renderCaseArchive();
-            burstParticles(recapPanel, 34);
-            showToast('事件解決');
-            showEndingOverlay(recap);
-            playSound('ending');
-            recapPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-
-        function hideRecap() {
-            recapPanel.classList.add('hidden');
-            recapTimeline.innerHTML = '';
-        }
-
-        function showEndingOverlay(recap) {
-            endingTitle.textContent = recap.verdict || 'CASE CLOSED';
-            endingText.textContent = recap.truth || recap.playerComment || '証拠と証言がつながり、真相に到達しました。';
-            endingOverlay.classList.remove('hidden');
-        }
-
-        function archiveSolvedCase(recap, scene) {
-            const archive = getCaseArchive();
-            const solution = state.solution || {};
-            const selectedPreset = document.querySelector('.preset.selected');
-            const title = (state.demoCase && state.demoCase.title) || scene.sceneTitle || (selectedPreset && selectedPreset.dataset.label) || '未整理の事件';
-            const culprit = document.getElementById('culpritInput').value.trim() || solution.culprit || '不明';
-            const evidence = state.evidence.find((item) => item.id === decisiveEvidenceSelect.value);
-            const keyEvidence = recap.keyEvidence || (evidence && evidence.title) || '証拠と証言の矛盾';
-            const truth = recap.truth || solution.summary || '真相は事件ファイルに記録されました。';
-            const key = [state.caseName, title, culprit, truth].join('::');
-            const entry = {
-                key,
-                savedAt: new Date().toISOString(),
-                title,
-                culprit,
-                keyEvidence,
-                truth,
-                verdict: recap.verdict || '解決',
-                caseType: state.caseName
-            };
-            const next = [entry].concat(archive.filter((item) => item.key !== key)).slice(0, 6);
-            localStorage.setItem('mysteryCaseArchive', JSON.stringify(next));
-        }
-
-        function getCaseArchive() {
-            try {
-                const archive = JSON.parse(localStorage.getItem('mysteryCaseArchive') || '[]');
-                return Array.isArray(archive) ? archive : [];
-            } catch (error) {
-                return [];
-            }
-        }
-
-        function renderCaseArchive() {
-            const archive = getCaseArchive();
-            caseArchiveList.innerHTML = '';
-            clearArchiveBtn.disabled = !archive.length;
-            if (!archive.length) {
-                const empty = document.createElement('div');
-                empty.className = 'archive-empty';
-                empty.textContent = '解決した事件はここに保存されます。';
-                caseArchiveList.appendChild(empty);
-                return;
-            }
-
-            archive.forEach((item) => {
-                const card = document.createElement('article');
-                card.className = 'archive-card';
-                const date = new Date(item.savedAt);
-                const dateLabel = Number.isNaN(date.getTime()) ? '記録済み' : date.toLocaleDateString('ja-JP');
-                card.innerHTML = '<div><strong></strong><span></span></div><p></p><small></small>';
-                card.querySelector('strong').textContent = item.title || '解決済み事件';
-                card.querySelector('span').textContent = (item.verdict || '解決') + ' / ' + dateLabel;
-                card.querySelector('p').textContent = '犯人: ' + (item.culprit || '不明') + '。決め手: ' + (item.keyEvidence || '証拠と証言の矛盾');
-                card.querySelector('small').textContent = item.truth || '';
-                caseArchiveList.appendChild(card);
-            });
-        }
-
-        function saveGame() {
-            const selectedPreset = document.querySelector('.preset.selected');
-            const snapshot = {
-                version: 1,
-                savedAt: new Date().toISOString(),
-                selectedCase: selectedPreset ? selectedPreset.dataset.case : state.caseName,
-                selectedLabel: selectedPreset ? selectedPreset.dataset.label : '',
-                selectedWorld: selectedPreset ? selectedPreset.dataset.world : state.baseWorld,
-                hero: document.getElementById('heroInput').value,
-                tone: document.getElementById('toneSelect').value,
-                theme: themeSelect.value,
-                accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-                soundEnabled: state.soundEnabled,
-                deduction: {
-                    culprit: document.getElementById('culpritInput').value,
-                    motive: document.getElementById('motiveInput').value,
-                    trick: document.getElementById('trickInput').value,
-                    evidenceId: decisiveEvidenceSelect.value
-                },
-                bodyClasses: Array.from(document.body.classList),
-                state: JSON.parse(JSON.stringify(state))
-            };
-            localStorage.setItem('mysteryStorySave', JSON.stringify(snapshot));
-            showToast('保存しました');
-            playSound('save');
-        }
-
-        function loadGame() {
-            const raw = localStorage.getItem('mysteryStorySave');
-            if (!raw) {
-                showToast('保存データがありません');
-                playSound('miss');
-                return;
-            }
-
-            let snapshot;
-            try {
-                snapshot = JSON.parse(raw);
-            } catch (error) {
-                showToast('保存データを読み込めません');
-                playSound('miss');
-                return;
-            }
-            if (!snapshot || !snapshot.state) {
-                showToast('保存データの形式が古いです');
-                playSound('miss');
-                return;
-            }
-
-            Object.assign(state, snapshot.state);
-            document.getElementById('heroInput').value = snapshot.hero || '高校生探偵ミナト';
-            document.getElementById('toneSelect').value = snapshot.tone || '不思議で、推理したくなる';
-            state.soundEnabled = snapshot.soundEnabled !== false && state.soundEnabled !== false;
-            soundToggle.checked = state.soundEnabled;
-            if (snapshot.selectedCase) {
-                presets.forEach((preset) => {
-                    preset.classList.toggle('selected', preset.dataset.case === snapshot.selectedCase);
-                });
-            }
-            if (snapshot.theme) {
-                themeSelect.value = snapshot.theme;
-                document.body.classList.remove('theme-noir', 'theme-neon', 'theme-sunset', 'theme-mint');
-                document.body.classList.add(snapshot.theme);
-            }
-            if (snapshot.accent) {
-                document.documentElement.style.setProperty('--accent', snapshot.accent);
-            }
-
-            setupPanel.classList.toggle('hidden', Boolean(state.currentScene));
-            scenePanel.classList.toggle('hidden', !state.currentScene);
-            clearHighlights();
-            hideRecap();
-            updateStats();
-            renderCaseBoard();
-            const deduction = snapshot.deduction || {};
-            document.getElementById('culpritInput').value = deduction.culprit || '';
-            document.getElementById('motiveInput').value = deduction.motive || '';
-            document.getElementById('trickInput').value = deduction.trick || '';
-            decisiveEvidenceSelect.value = deduction.evidenceId || '';
-            renderVisualOverview();
-            if (state.currentScene) {
-                renderScene(state.currentScene);
-                state.stats = snapshot.state.stats;
-                updateStats();
-                document.getElementById('culpritInput').value = deduction.culprit || '';
-                document.getElementById('motiveInput').value = deduction.motive || '';
-                document.getElementById('trickInput').value = deduction.trick || '';
-                decisiveEvidenceSelect.value = deduction.evidenceId || '';
-            }
-            showToast('ロードしました');
-            playSound('save');
-        }
-
-        function replayCase() {
-            endingOverlay.classList.add('hidden');
-            const wasDemo = state.caseName === 'demo';
-            const replayDemo = wasDemo && state.demoCase;
-            state.turn = 1;
-            state.history = 'まだ物語は始まっていない。';
-            state.lastChoice = '捜査を開始する';
-            state.stats = { clues: 0, logic: 0, suspicion: 0 };
-            state.evidence = [];
-            state.testimonies = [];
-            state.contradictions = [];
-            state.solvedContradictions = [];
-            state.characters = [];
-            state.solution = null;
-            state.hints = [];
-            state.hintIndex = 0;
-            state.recap = null;
-            state.currentScene = null;
-            if (replayDemo) {
-                state.demoCase = JSON.parse(JSON.stringify(state.demoCase));
-            }
-            clearCaseBoard();
-            hideRecap();
-            updateStats();
-            showToast('リプレイ開始');
-            playSound('start');
-            requestScene();
-        }
-
-        function showHowTo() {
-            howToOverlay.classList.remove('hidden');
-            playSound('click');
-        }
-
-        function hideHowTo() {
-            howToOverlay.classList.add('hidden');
-            playSound('click');
-        }
-
-        let audioContext;
-        function playSound(type) {
-            if (!state.soundEnabled) return;
-            try {
-                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-                const now = audioContext.currentTime;
-                const osc = audioContext.createOscillator();
-                const gain = audioContext.createGain();
-                const map = {
-                    click: [360, 0.045],
-                    start: [520, 0.09],
-                    scene: [420, 0.055],
-                    success: [720, 0.13],
-                    miss: [160, 0.11],
-                    submit: [580, 0.12],
-                    ending: [880, 0.22],
-                    save: [640, 0.08]
-                };
-                const [freq, duration] = map[type] || map.click;
-                osc.type = type === 'miss' ? 'sawtooth' : 'sine';
-                osc.frequency.setValueAtTime(freq, now);
-                if (type === 'success' || type === 'ending') {
-                    osc.frequency.exponentialRampToValueAtTime(freq * 1.35, now + duration);
-                }
-                gain.gain.setValueAtTime(0.0001, now);
-                gain.gain.exponentialRampToValueAtTime(0.07, now + 0.01);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-                osc.connect(gain).connect(audioContext.destination);
-                osc.start(now);
-                osc.stop(now + duration + 0.02);
-            } catch (error) {
-                state.soundEnabled = false;
-                soundToggle.checked = false;
-            }
-        }
-
-        function setAssistGuide(title, message) {
-            assistGuide.innerHTML = '<strong></strong><span></span>';
-            assistGuide.querySelector('strong').textContent = title;
-            assistGuide.querySelector('span').textContent = message;
-        }
-
-        function highlightElements(elements) {
-            elements.forEach((element) => {
-                if (element) element.classList.add('demo-highlight');
-            });
-        }
-
-        function clearHighlights() {
-            document.querySelectorAll('.demo-highlight').forEach((element) => {
-                element.classList.remove('demo-highlight');
-            });
-        }
-
-        function revealSceneText(text) {
-            const sceneText = document.getElementById('sceneText');
-            sceneText.textContent = '';
-            const chars = Array.from(text);
-            const step = Math.max(2, Math.ceil(chars.length / 90));
-            let index = 0;
-            const timer = setInterval(() => {
-                sceneText.textContent += chars.slice(index, index + step).join('');
-                index += step;
-                if (index >= chars.length) clearInterval(timer);
-            }, 10);
-        }
-
-        function ripple(event, element) {
-            const circle = document.createElement('span');
-            const rect = element.getBoundingClientRect();
-            const size = Math.max(rect.width, rect.height);
-            circle.className = 'ripple';
-            circle.style.width = size + 'px';
-            circle.style.height = size + 'px';
-            circle.style.left = (event.clientX - rect.left - size / 2) + 'px';
-            circle.style.top = (event.clientY - rect.top - size / 2) + 'px';
-            element.appendChild(circle);
-            setTimeout(() => circle.remove(), 650);
-        }
-
-        function burstParticles(origin, count = 18) {
-            const rect = origin.getBoundingClientRect();
-            const x = rect.left + rect.width / 2;
-            const y = rect.top + rect.height / 2;
-            for (let i = 0; i < count; i += 1) {
-                const particle = document.createElement('i');
-                const angle = (Math.PI * 2 * i) / count;
-                const distance = 70 + Math.random() * 90;
-                particle.className = 'particle';
-                particle.style.left = x + 'px';
-                particle.style.top = y + 'px';
-                particle.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
-                particle.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
-                particle.style.setProperty('--hue', String(Math.floor(Math.random() * 80) + 25));
-                fxLayer.appendChild(particle);
-                setTimeout(() => particle.remove(), 900);
-            }
-        }
-
-        function showToast(message) {
-            actionToast.textContent = message;
-            actionToast.classList.remove('hidden', 'toast-show');
-            void actionToast.offsetWidth;
-            actionToast.classList.add('toast-show');
-            setTimeout(() => actionToast.classList.add('hidden'), 1300);
-        }
-
-        function flashElement(element) {
-            element.classList.remove('quick-flash');
-            void element.offsetWidth;
-            element.classList.add('quick-flash');
-        }
-
-        function shakeScreen() {
-            document.body.classList.remove('screen-shake');
-            void document.body.offsetWidth;
-            document.body.classList.add('screen-shake');
-            setTimeout(() => document.body.classList.remove('screen-shake'), 360);
-        }
-
-        function pickDemoVariant() {
-            return demoVariants[Math.floor(Math.random() * demoVariants.length)] + ' seed=' + Date.now().toString(36);
-        }
-
-        function pickLocalDemoCase() {
-            state.demoCaseIndex = Math.floor(Math.random() * demoCaseTemplates.length);
-            const template = demoCaseTemplates[state.demoCaseIndex];
-            return JSON.parse(JSON.stringify(template));
-        }
-
-        function setBusy(isBusy) {
-            loading.classList.toggle('show', isBusy);
-            generationOverlay.classList.toggle('hidden', !isBusy);
-            document.body.classList.toggle('generating', isBusy);
-            startBtn.disabled = isBusy;
-            hintBtn.disabled = isBusy;
-            answerBtn.disabled = isBusy;
-            choiceList.querySelectorAll('button').forEach((button) => {
-                button.disabled = isBusy;
-            });
-            checkContradictionBtn.disabled = isBusy || !state.testimonies.length || !state.evidence.length;
-            submitDeductionBtn.disabled = isBusy || deductionPanel.classList.contains('hidden') || !state.evidence.length;
-        }
-    </script>
+    </section>
+
+    <section class="game-loading hidden" id="gameLoading" aria-live="polite">
+        <div class="loading-card">
+            <span class="hud-kicker">OpenAI API</span>
+            <strong id="loadingTitle">AI生成中</strong>
+            <div class="loading-bar"><i></i></div>
+            <p id="loadingText">事件の整合性を確認しています。</p>
+        </div>
+    </section>
+
+    <section class="coach-bubble hidden" id="coachBubble">
+        <button id="coachNextBtn" type="button" aria-label="次へ">×</button>
+        <strong id="coachTitle">操作説明</strong>
+        <p id="coachText"></p>
+    </section>
+
+    <script type="module" src="office3d.js"></script>
+    <script src="detective-sim.js"></script>
 </body>
 </html>

@@ -6,8 +6,16 @@
     <title>AI Mystery Brancher</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="story.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/vendor/three/build/three.module.js",
+                "three/addons/": "/vendor/three/examples/jsm/"
+            }
+        }
+    </script>
 </head>
-<body class="story-page demo-case">
+<body class="story-page demo-case office-hub-mode">
     <div class="container story-shell">
         <header class="header story-header">
             <div>
@@ -18,6 +26,7 @@
             <div class="header-actions">
                 <button class="btn secondary-btn" id="howToBtn">遊び方</button>
                 <button class="btn secondary-btn" id="settingsBtn">設定</button>
+                <button class="btn secondary-btn" id="officeReturnBtn" type="button">事務所へ</button>
                 <a class="btn secondary-btn" href="quiz.html">クイズへ</a>
             </div>
         </header>
@@ -68,6 +77,49 @@
 
         <main class="story-board">
             <section class="setup-panel" id="setupPanel">
+                <section class="office-home" id="officeHome" aria-label="3D探偵事務所ホーム">
+                    <div class="office-stage" id="officeStage">
+                        <canvas id="officeCanvas" aria-label="歩き回れる3D探偵事務所"></canvas>
+                        <div class="office-reticle" aria-hidden="true"></div>
+                        <div class="office-lock-prompt" id="officeLockPrompt">
+                            <strong>クリックして探索開始</strong>
+                            <span>WASDで移動、Shiftで早歩き、マウスで視点変更、左クリックで調査</span>
+                        </div>
+                        <div class="office-hud">
+                            <div>
+                                <span class="story-kicker">AI Detective Office</span>
+                                <strong id="officeFocusName">事務所を探索中</strong>
+                                <p id="officeFocusDescription">近づいて左クリックで調べます。Escで視点ロック解除。</p>
+                            </div>
+                            <div class="office-state">
+                                <span id="officeTimeLabel">夜</span>
+                                <span id="officeWeatherLabel">雨</span>
+                            </div>
+                        </div>
+                        <div class="office-mini-map" aria-hidden="true">
+                            <span class="map-dot map-door"></span>
+                            <span class="map-dot map-desk"></span>
+                            <span class="map-dot map-board"></span>
+                            <span class="map-dot map-ai"></span>
+                            <span class="map-dot map-player" id="officePlayerDot"></span>
+                        </div>
+                        <div class="office-log" id="officeLog" aria-live="polite">
+                            クリックで視点をロックして、探偵事務所を歩き回れます。
+                        </div>
+                        <div class="office-panel hidden" id="officePanel" role="dialog" aria-modal="true">
+                            <div class="office-panel-card">
+                                <div class="office-panel-heading">
+                                    <div>
+                                        <span class="story-kicker" id="officePanelKicker">Detective Office</span>
+                                        <h2 id="officePanelTitle">探偵事務所</h2>
+                                    </div>
+                                    <button class="btn secondary-btn mini-btn" id="officePanelClose">3D事務所へ戻る</button>
+                                </div>
+                                <div class="office-panel-body" id="officePanelBody"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="setup-layout">
                     <div class="case-visual setup-visual" aria-hidden="true">
                         <div class="visual-window">
@@ -88,6 +140,10 @@
                     </div>
 
                     <div class="setup-content">
+                        <div class="panel-heading setup-desk-heading" id="caseDeskPanel">
+                            <h3>事件ボード</h3>
+                            <span>3D事務所から選んだ事件をここで調整します</span>
+                        </div>
                         <div class="form-group">
                             <label>事件ファイル</label>
                             <div class="preset-grid" id="presetGrid">
@@ -427,9 +483,13 @@
         const howToCloseBtn = document.getElementById('howToCloseBtn');
         const settingsBtn = document.getElementById('settingsBtn');
         const settingsPanel = document.getElementById('settingsPanel');
+        const officeReturnBtn = document.getElementById('officeReturnBtn');
         const themeSelect = document.getElementById('themeSelect');
         const swatchRow = document.getElementById('swatchRow');
         const soundToggle = document.getElementById('soundToggle');
+        const officeHome = document.getElementById('officeHome');
+        const officeActions = document.querySelectorAll('[data-office-action]');
+        const caseDeskPanel = document.getElementById('caseDeskPanel');
         const startBtn = document.getElementById('startBtn');
         const resetBtn = document.getElementById('resetBtn');
         const saveBtn = document.getElementById('saveBtn');
@@ -647,6 +707,7 @@
             currentScene: null,
             soundEnabled: true
         };
+        window.mysteryGameState = state;
 
         document.body.classList.add('theme-noir');
         randomizeCaseFiles();
@@ -695,6 +756,7 @@
         saveBtn.addEventListener('click', saveGame);
         loadBtn.addEventListener('click', loadGame);
         replayBtn.addEventListener('click', replayCase);
+        officeReturnBtn.addEventListener('click', () => returnToOffice());
         endingReplayBtn.addEventListener('click', replayCase);
         endingArchiveBtn.addEventListener('click', () => {
             endingOverlay.classList.add('hidden');
@@ -710,6 +772,10 @@
             renderCaseArchive();
             showToast('事件ファイルを整理しました');
             playSound('click');
+        });
+
+        officeActions.forEach((action) => {
+            action.addEventListener('click', () => handleOfficeAction(action.dataset.officeAction));
         });
 
         presets.forEach((preset) => {
@@ -741,6 +807,31 @@
             state.baseWorld = selected.dataset.world;
             state.caseName = selected.dataset.case;
             updateCaseTheme(selected.dataset.case, selected.dataset.label);
+        }
+
+        function handleOfficeAction(action) {
+            playSound('click');
+            if (action === 'howto') {
+                showHowTo();
+                return;
+            }
+            if (action === 'settings') {
+                settingsPanel.classList.remove('hidden');
+                settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            if (action === 'start') {
+                startBtn.click();
+                return;
+            }
+            if (action === 'archive') {
+                renderCaseArchive();
+                document.querySelector('.case-archive').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            if (caseDeskPanel) {
+                caseDeskPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         startBtn.addEventListener('click', () => {
@@ -788,6 +879,8 @@
             state.recap = null;
             state.currentScene = null;
             endingOverlay.classList.add('hidden');
+            document.body.classList.remove('office-case-active');
+            window.dispatchEvent(new CustomEvent('office:return-from-case'));
             setupPanel.classList.remove('hidden');
             scenePanel.classList.add('hidden');
             choiceList.innerHTML = '';
@@ -855,7 +948,7 @@
                 renderScene(scene);
             } catch (error) {
                 console.error(error);
-                statusEl.textContent = 'AI生成に失敗しました。Renderの環境変数とAPIキーを確認してください: ' + error.message;
+                statusEl.textContent = 'AI生成に失敗しました: ' + formatApiErrorMessage(error.message);
                 statusEl.style.color = '#c53030';
                 showToast('AI生成に失敗しました');
             } finally {
@@ -863,8 +956,19 @@
             }
         }
 
+        function formatApiErrorMessage(message) {
+            if (/Unsupported method \('POST'\)|Error code: 501|<!DOCTYPE/i.test(message)) {
+                return 'APIサーバーではなく静的ファイルサーバーで開いています。`npm start` でExpressを起動し、ExpressのURLから開いてください。';
+            }
+            if (/OPENAI_API_KEY|GEMINI_API_KEY|API_KEY/i.test(message)) {
+                return 'LLMの環境変数が未設定です。OpenAIならOPENAI_API_KEY、GeminiならGEMINI_API_KEYを設定してください。詳細: ' + message;
+            }
+            return message;
+        }
+
         function renderScene(scene) {
             state.currentScene = scene;
+            document.body.classList.add('office-case-active');
             setupPanel.classList.add('hidden');
             scenePanel.classList.remove('hidden');
 
@@ -921,6 +1025,21 @@
             statusEl.style.color = '#2f855a';
             renderAssistMode();
             playSound(scene.ending ? 'ending' : 'scene');
+        }
+
+        function returnToOffice() {
+            endingOverlay.classList.add('hidden');
+            document.body.classList.remove('office-case-active');
+            setupPanel.classList.remove('hidden');
+            scenePanel.classList.add('hidden');
+            clearHighlights();
+            statusEl.textContent = state.currentScene ? '3D事務所に戻りました' : 'Ready';
+            statusEl.style.color = '#2f855a';
+            window.dispatchEvent(new CustomEvent('office:return-from-case'));
+            requestAnimationFrame(() => {
+                officeHome.scrollIntoView({ block: 'start' });
+            });
+            playSound('click');
         }
 
         function addCaseItems(scene) {
@@ -1621,6 +1740,7 @@
 
             setupPanel.classList.toggle('hidden', Boolean(state.currentScene));
             scenePanel.classList.toggle('hidden', !state.currentScene);
+            document.body.classList.toggle('office-case-active', Boolean(state.currentScene));
             clearHighlights();
             hideRecap();
             updateStats();
@@ -1827,5 +1947,6 @@
             submitDeductionBtn.disabled = isBusy || deductionPanel.classList.contains('hidden') || !state.evidence.length;
         }
     </script>
+    <script type="module" src="office3d.js"></script>
 </body>
 </html>

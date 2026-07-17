@@ -11,6 +11,10 @@
     <div class="container">
         <div class="header">
             <h1>ITパスポート対策クイズ</h1>
+            <div class="header-actions">
+                <a class="btn" href="index.html">事務所へ</a>
+                <a class="btn" href="story.html">推理へ</a>
+            </div>
         </div>
 
         <div class="quiz-container">
@@ -104,8 +108,15 @@
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'API error');
+                    const errorText = await response.text();
+                    let message = errorText || response.statusText;
+                    try {
+                        const error = JSON.parse(errorText);
+                        message = error.error || message;
+                    } catch (parseError) {
+                        message = errorText || response.statusText;
+                    }
+                    throw new Error(formatApiErrorMessage(message));
                 }
 
                 const data = await response.json();
@@ -126,6 +137,13 @@
             } finally {
                 document.getElementById('loading').classList.remove('show');
             }
+        }
+
+        function formatApiErrorMessage(message) {
+            if (/Unsupported method \('POST'\)|Error code: 501|<!DOCTYPE/i.test(message)) {
+                return 'APIサーバーではなく静的ファイルサーバーで開いています。`npm start` でExpressを起動し、ExpressのURLから開いてください。';
+            }
+            return message;
         }
 
         // クイズ開始
